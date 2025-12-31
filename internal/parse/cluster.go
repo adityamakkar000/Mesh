@@ -2,6 +2,7 @@ package parse
 
 import (
     "fmt"
+    "net"
     "os"
     "path/filepath"
     "gopkg.in/yaml.v3"
@@ -32,16 +33,27 @@ func ParseClusters(path string) (Clusters, error) {
         return nil, err
     }
 
-    for k := range clusters {
-        var n_hosts = len(clusters[k].Hosts)
-        if n_hosts == 0 {
-            fmt.Printf("expected cluster %s to have at least 1 IP got 0\n", k)
-            delete(clusters, k)
-        } else{
-            fmt.Printf("Parse cluster %s with %d hosts\n", k, n_hosts)
+        for k := range clusters {
+            var n_hosts = len(clusters[k].Hosts)
+            if n_hosts == 0 {
+                fmt.Printf("expected cluster %s to have at least 1 IP got 0\n", k)
+                delete(clusters, k)
+                continue
+            }
+            
+            for _, host := range clusters[k].Hosts {
+                if net.ParseIP(host) == nil {
+                    fmt.Printf("invalid IP address %s in cluster %s\n", host, k)
+                    delete(clusters, k)
+                    break
+                }
+            }
+            
+            if _, exists := clusters[k]; exists {
+                fmt.Printf("parsed cluster %s with %d hosts\n", k, n_hosts)
+            }
         }
-        
-    }
+
 
     return clusters, nil
 }
