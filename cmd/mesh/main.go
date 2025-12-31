@@ -1,9 +1,15 @@
 package main
 
 import (
-	"fmt"
+	"github.com/adityamakkar000/Mesh/internal/parse"
 )
 
 func main() {
-	fmt.Println("Hello, World!")
+	clusters, err := parse.ParseClusters("./cluster.yaml") 
+
+	if err != nil {
+		panic(err)
+	}
+
+	_ = clusters 
 }

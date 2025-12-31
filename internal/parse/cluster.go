@@ -33,9 +33,14 @@ func ParseClusters(path string) (Clusters, error) {
     }
 
     for k := range clusters {
-        if len(clusters[k].Hosts) == 0 {
-            panic(fmt.Sprintf("expected cluster %s to have at least 1 IP", k))
+        var n_hosts = len(clusters[k].Hosts)
+        if n_hosts == 0 {
+            fmt.Printf("expected cluster %s to have at least 1 IP got 0\n", k)
+            delete(clusters, k)
+        } else{
+            fmt.Printf("Parse cluster %s with %d hosts\n", k, n_hosts)
         }
+        
     }
 
     return clusters, nil
