@@ -30,6 +30,6 @@ func LogsDir(clusterName string) string {
 	return filepath.Join(cacheDir(), clusterName, "logs")
 }
 
-func ConfigFile() string {
-	return filepath.Join(configDir(), "node.yaml")
+func ClusterFile() string {
+	return filepath.Join(configDir(), "cluster.yaml")
 }
