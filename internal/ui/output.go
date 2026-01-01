@@ -55,6 +55,10 @@ func ErrorWrap(err error, format string, args ...any) error {
 	return fmt.Errorf("%w: %w", wrapped, err)
 }
 
+func Warn(msg string) {
+	fmt.Printf("%sWARN: %s%s\n", Yellow, msg, Reset)
+}
+
 func Info(msg string) {
 	fmt.Printf("%s==> %s%s\n", Cyan, msg, Reset)
 }
