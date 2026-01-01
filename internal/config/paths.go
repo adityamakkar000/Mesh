@@ -26,14 +26,10 @@ func cacheDir() string {
 	return filepath.Join(configDir(), "cache")
 }
 
-func JobsDir() string {
-	return filepath.Join(cacheDir(), "jobs")
-}
-
-func LogsDir(jobID string) string {
-	return filepath.Join(JobsDir(), jobID, "logs")
+func LogsDir(clusterName string) string {
+	return filepath.Join(cacheDir(), clusterName, "logs")
 }
 
 func ConfigFile() string {
-	return filepath.Join(configDir(), "mesh.yaml")
+	return filepath.Join(configDir(), "node.yaml")
 }

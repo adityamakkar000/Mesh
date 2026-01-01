@@ -1,0 +1,15 @@
+commands:
+  - echo "test 123"
+  - sleep 5
+  - echo "streaming works"
+
+ignore:
+  - "*.pyc"
+  - "__pycache__/"
+  - ".git/"
+  - ".env"
+
+prerun:
+  - echo "Starting setup..."
+  - whoami
+  - hostname

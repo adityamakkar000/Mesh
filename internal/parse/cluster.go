@@ -13,7 +13,6 @@ type NodeConfig struct {
 	User         string   `yaml:"user"`
 	IdentityFile string   `yaml:"identity_file"`
 	Hosts        []string `yaml:"hosts"`
-	Commands     []string `yaml:"commands"`
 }
 
 type ClusterMap map[string]NodeConfig

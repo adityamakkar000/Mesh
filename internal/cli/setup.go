@@ -6,6 +6,7 @@ import (
 	"os"
 	"sync"
 
+	"github.com/adityamakkar000/Mesh/internal/config"
 	"github.com/adityamakkar000/Mesh/internal/parse"
 	"github.com/adityamakkar000/Mesh/internal/ssh"
 	"github.com/adityamakkar000/Mesh/internal/ui"
@@ -13,18 +14,18 @@ import (
 )
 
 var setupCmd = &cobra.Command{
-	Use:   "setup <cluster_path> <cluster_name>",
-	Short: "Setup a cluster from a YAML configuration",
-	Long: `Setup a cluster by parsing the YAML configuration file and executing setup commands.
+	Use:   "setup <cluster_name>",
+	Short: "Setup a cluster from mesh.yaml configuration",
+	Long: `Setup a cluster by reading cluster info from ~/.config/mesh/node.yaml
+and setup commands from ./mesh.yaml.
 
 Example:
-  mesh setup ./cluster.yaml my-cluster`,
-	Args: cobra.ExactArgs(2),
+  mesh setup my-cluster`,
+	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		clusterPath := args[0]
-		clusterName := args[1]
+		clusterName := args[0]
 
-		if err := runSetup(clusterPath, clusterName); err != nil {
+		if err := runSetup(clusterName); err != nil {
 			os.Exit(1)
 		}
 	},
@@ -34,19 +35,24 @@ func init() {
 	rootCmd.AddCommand(setupCmd)
 }
 
-func runSetup(clusterPath, clusterName string) error {
-	clusters, err := parse.Clusters(clusterPath)
+func runSetup(clusterName string) error {
+	clusters, err := parse.Clusters(config.ConfigFile())
 	if err != nil {
-		return ui.ErrorWrap(err, "failed to parse clusters")
+		return ui.ErrorWrap(err, "failed to parse node.yaml")
 	}
 
 	cluster, ok := clusters[clusterName]
 	if !ok {
-		return ui.ErrorWrap(err, "cluster '%s' not found in %s", clusterName, clusterPath)
+		return ui.ErrorWrap(fmt.Errorf("cluster not found"), "cluster '%s' not found in node.yaml", clusterName)
 	}
 
-	if len(cluster.Commands) == 0 {
-		ui.Info(fmt.Sprintf("No commands to run for cluster '%s'", clusterName))
+	mesh, err := parse.Mesh("mesh.yaml")
+	if err != nil {
+		return ui.ErrorWrap(err, "failed to parse mesh.yaml")
+	}
+
+	if len(mesh.Commands) == 0 {
+		ui.Info("No commands to run in mesh.yaml")
 		return nil
 	}
 
@@ -70,7 +76,7 @@ func runSetup(clusterPath, clusterName string) error {
 				stderr = io.Discard
 			}
 
-			if err := setupHost(cluster, host, stdout, stderr); err != nil {
+			if err := setupHost(cluster, mesh, host, stdout, stderr); err != nil {
 				errChan <- fmt.Errorf("host %s: %w", host, err)
 			}
 		}(i, host)
@@ -93,14 +99,14 @@ func runSetup(clusterPath, clusterName string) error {
 	return nil
 }
 
-func setupHost(cluster parse.NodeConfig, host string, stdout, stderr io.Writer) error {
+func setupHost(cluster parse.NodeConfig, mesh *parse.MeshConfig, host string, stdout, stderr io.Writer) error {
 	client, err := ssh.Connect(cluster.User, host, cluster.IdentityFile)
 	if err != nil {
 		return ui.ErrorWrap(err, "failed to connect")
 	}
 	defer client.Close()
 
-	for _, command := range cluster.Commands {
+	for _, command := range mesh.Commands {
 		if err := client.Exec(command, stdout, stderr); err != nil {
 			return ui.ErrorWrap(err, "failed to execute '%s'", command)
 		}
