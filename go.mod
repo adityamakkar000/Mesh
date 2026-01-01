@@ -2,6 +2,7 @@ module github.com/adityamakkar000/Mesh
 
 go 1.25.5
 
+require gopkg.in/yaml.v3 v3.0.1
 require github.com/spf13/cobra v1.10.2
 
 require (
