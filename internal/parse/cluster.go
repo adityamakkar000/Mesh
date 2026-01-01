@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 
 	"gopkg.in/yaml.v3"
+	"github.com/adityamakkar000/Mesh/internal/config"
+	"github.com/adityamakkar000/Mesh/internal/ui"
 )
 
 type NodeConfig struct {
@@ -17,8 +19,8 @@ type NodeConfig struct {
 
 type ClusterMap map[string]NodeConfig
 
-func Clusters(path string) (ClusterMap, error) {
-	filename, err := filepath.Abs(path)
+func Clusters() (ClusterMap, error) {
+	filename, err := filepath.Abs(config.ClusterFile())
 	if err != nil {
 		return nil, err
 	}
@@ -36,23 +38,29 @@ func Clusters(path string) (ClusterMap, error) {
 	for k := range clusters {
 		var n_hosts = len(clusters[k].Hosts)
 		if n_hosts == 0 {
-			fmt.Printf("expected cluster %s to have at least 1 IP got 0\n", k)
+            ui.Error(fmt.Sprintf("expected cluster %s to have at least 1 IP got 0", k))
 			delete(clusters, k)
 			continue
 		}
 
 		for _, host := range clusters[k].Hosts {
 			if net.ParseIP(host) == nil {
-				fmt.Printf("invalid IP address %s in cluster %s\n", host, k)
+                ui.Error(fmt.Sprintf("invalid IP address %s in cluster %s", host, k))
 				delete(clusters, k)
 				break
 			}
 		}
 
 		if _, exists := clusters[k]; exists {
-			fmt.Printf("parsed cluster %s with %d hosts\n", k, n_hosts)
+			ui.Info(fmt.Sprintf("parsed cluster %s with %d hosts", k, n_hosts))
 		}
 	}
+
+	var cluster_names []string
+	for k := range clusters {
+		cluster_names = append(cluster_names, k)
+	}
+	ui.Info(fmt.Sprintf("available clusters: %v", cluster_names))
 
 	return clusters, nil
 }

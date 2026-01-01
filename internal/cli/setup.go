@@ -6,7 +6,7 @@ import (
 	"os"
 	"sync"
 
-	"github.com/adityamakkar000/Mesh/internal/config"
+	
 	"github.com/adityamakkar000/Mesh/internal/parse"
 	"github.com/adityamakkar000/Mesh/internal/ssh"
 	"github.com/adityamakkar000/Mesh/internal/ui"
@@ -36,14 +36,15 @@ func init() {
 }
 
 func runSetup(clusterName string) error {
-	clusters, err := parse.Clusters(config.ConfigFile())
+	clusters, err := parse.Clusters()
 	if err != nil {
 		return ui.ErrorWrap(err, "failed to parse node.yaml")
 	}
 
 	cluster, ok := clusters[clusterName]
+
 	if !ok {
-		return ui.ErrorWrap(fmt.Errorf("cluster not found"), "cluster '%s' not found in node.yaml", clusterName)
+		return ui.ErrorWrap(fmt.Errorf("cluster not found"), "cluster '%s' not found in cluster.yaml", clusterName)
 	}
 
 	mesh, err := parse.Mesh("mesh.yaml")
