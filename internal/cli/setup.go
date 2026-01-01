@@ -21,7 +21,7 @@ Example:
 
 		fmt.Printf("Setting up cluster '%s' from %s\n", clusterName, clusterPath)
 
-		clusters, err := parse.ParseClusters(clusterPath)
+		clusters, err := parse.Clusters(clusterPath)
 
 		if err != nil {
 			panic(err)

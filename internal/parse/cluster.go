@@ -14,10 +14,10 @@ type NodeConfig struct {
     Hosts        []string `yaml:"hosts"`
 }
 
-type Clusters map[string]NodeConfig
+type ClusterMap map[string]NodeConfig
 
 
-func ParseClusters(path string) (Clusters, error) {
+func Clusters(path string) (ClusterMap, error) {
     filename, err := filepath.Abs(path)
     if err != nil {
         return nil, err
@@ -28,7 +28,7 @@ func ParseClusters(path string) (Clusters, error) {
         return nil, err
     }
 
-    var clusters Clusters
+    var clusters ClusterMap
     if err := yaml.Unmarshal(data, &clusters); err != nil {
         return nil, err
     }
