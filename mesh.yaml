@@ -8,6 +8,9 @@ ignore:
   - "__pycache__/"
   - ".git/"
   - ".env"
+  - "node.yaml"
+  - "mesh.yaml"
+  - "*/build/*"
 
 prerun:
   - echo "Starting setup..."
