@@ -48,7 +48,7 @@ func runSetup(clusterName string) error {
 		return ui.ErrorWrap(fmt.Errorf("cluster not found"), "cluster '%s' not found in cluster.yaml", clusterName)
 	}
 
-	mesh, err := parse.Mesh("mesh.yaml")
+	mesh, err := parse.Mesh()
 	if err != nil {
 		return ui.ErrorWrap(err, "failed to parse mesh.yaml")
 	}
