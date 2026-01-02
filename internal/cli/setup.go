@@ -18,7 +18,7 @@ import (
 var setupCmd = &cobra.Command{
 	Use:   "setup <cluster_name>",
 	Short: "Setup a cluster from mesh.yaml configuration",
-	Long: `Setup a cluster by reading cluster info from ~/.config/mesh/node.yaml
+	Long: `Setup a cluster by reading cluster info from ~/.config/mesh/cluster.yaml
 and setup commands from ./mesh.yaml.
 
 Example:
@@ -40,7 +40,7 @@ func init() {
 func runSetup(clusterName string) error {
 	clusters, err := parse.Clusters()
 	if err != nil {
-		return ui.ErrorWrap(err, "failed to parse node.yaml")
+		return ui.ErrorWrap(err, "failed to parse cluster.yaml")
 	}
 
 	cluster, ok := clusters[clusterName]
@@ -83,7 +83,7 @@ func runSetup(clusterName string) error {
 		go func(host string) {
 			defer wg.Done()
 
-			if err := setupHost(ctx, cluster, mesh, host); err != nil {
+			if err := setupHost(ctx, &cluster, mesh, host); err != nil {
 				mu.Lock()
 				failures++
 				mu.Unlock()
@@ -105,7 +105,7 @@ func runSetup(clusterName string) error {
 	return nil
 }
 
-func setupHost(ctx context.Context, cluster parse.NodeConfig, mesh *parse.MeshConfig, host string) error {
+func setupHost(ctx context.Context, cluster *parse.NodeConfig, mesh *parse.MeshConfig, host string) error {
 	client, err := ssh.Connect(ctx, cluster.User, host, cluster.IdentityFile)
 	if err != nil {
 		return fmt.Errorf("failed to connect: %w", err)
