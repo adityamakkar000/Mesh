@@ -66,3 +66,7 @@ func Info(msg string) {
 func Header(msg string) {
 	fmt.Printf("%s%s==> %s%s\n", Bold, Cyan, msg, Reset)
 }
+
+func Debug(msg string) {
+	fmt.Printf("%s[DEBUG] %s%s\n", Yellow, msg, Reset)
+}
