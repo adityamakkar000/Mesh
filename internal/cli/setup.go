@@ -1,12 +1,14 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
 	"sync"
+	"syscall"
 
-	
 	"github.com/adityamakkar000/Mesh/internal/parse"
 	"github.com/adityamakkar000/Mesh/internal/ssh"
 	"github.com/adityamakkar000/Mesh/internal/ui"
@@ -42,7 +44,6 @@ func runSetup(clusterName string) error {
 	}
 
 	cluster, ok := clusters[clusterName]
-
 	if !ok {
 		return ui.ErrorWrap(fmt.Errorf("cluster not found"), "cluster '%s' not found in cluster.yaml", clusterName)
 	}
@@ -59,38 +60,42 @@ func runSetup(clusterName string) error {
 
 	ui.Header(fmt.Sprintf("Setting up cluster '%s' (%d hosts)", clusterName, len(cluster.Hosts)))
 
-	var wg sync.WaitGroup
-	errChan := make(chan error, len(cluster.Hosts))
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-	for i, host := range cluster.Hosts {
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		select {
+		case <-sigChan:
+			ui.Warn("Interrupt received, canceling all connections...")
+			cancel()
+		case <-ctx.Done():
+		}
+	}()
+
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	failures := 0
+
+	for _, host := range cluster.Hosts {
 		wg.Add(1)
-		go func(idx int, host string) {
+		go func(host string) {
 			defer wg.Done()
 
-			var stdout, stderr io.Writer
-			if idx == 0 {
-				prefix := fmt.Sprintf("%s[%s]%s ", ui.Cyan, host, ui.Reset)
-				stdout = ui.NewPrefixWriter(prefix, os.Stdout)
-				stderr = ui.NewPrefixWriter(prefix, os.Stderr)
+			if err := setupHost(ctx, cluster, mesh, host); err != nil {
+				mu.Lock()
+				failures++
+				mu.Unlock()
+				ui.Error(fmt.Sprintf("[%s] failed: %v", host, err))
 			} else {
-				stdout = io.Discard
-				stderr = io.Discard
+				ui.Success(fmt.Sprintf("[%s] setup completed", host))
 			}
-
-			if err := setupHost(cluster, mesh, host, stdout, stderr); err != nil {
-				errChan <- fmt.Errorf("host %s: %w", host, err)
-			}
-		}(i, host)
+		}(host)
 	}
 
 	wg.Wait()
-	close(errChan)
-
-	failures := 0
-	for err := range errChan {
-		failures++
-		ui.Error(err.Error())
-	}
+	signal.Stop(sigChan)
 
 	if failures > 0 {
 		return fmt.Errorf("setup failed on %d host(s)", failures)
@@ -100,16 +105,16 @@ func runSetup(clusterName string) error {
 	return nil
 }
 
-func setupHost(cluster parse.NodeConfig, mesh *parse.MeshConfig, host string, stdout, stderr io.Writer) error {
-	client, err := ssh.Connect(cluster.User, host, cluster.IdentityFile)
+func setupHost(ctx context.Context, cluster parse.NodeConfig, mesh *parse.MeshConfig, host string) error {
+	client, err := ssh.Connect(ctx, cluster.User, host, cluster.IdentityFile)
 	if err != nil {
-		return ui.ErrorWrap(err, "failed to connect")
+		return fmt.Errorf("failed to connect: %w", err)
 	}
 	defer client.Close()
 
 	for _, command := range mesh.Commands {
-		if err := client.Exec(command, stdout, stderr); err != nil {
-			return ui.ErrorWrap(err, "failed to execute '%s'", command)
+		if err := client.Exec(ctx, command, io.Discard, io.Discard); err != nil {
+			return fmt.Errorf("failed to execute '%s': %w", command, err)
 		}
 	}
 

@@ -1,6 +1,6 @@
 commands:
   - echo "test 123"
-  - sleep 5
+  - sleep 3
   - echo "streaming works"
 
 ignore:
