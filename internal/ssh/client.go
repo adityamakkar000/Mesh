@@ -109,7 +109,7 @@ func (c *Client) ExecDetached(ctx context.Context, command string) error {
 }
 
 // Transfers data from a reader to a remote file path
-func (c *Client) Copy(ctx context.Context, reader io.Reader, remotePath string, mode string) error {
+func (c *Client) SendTar(ctx context.Context, reader io.Reader, remotePath string) error {
 	session, err := c.conn.NewSession()
 	if err != nil {
 		return fmt.Errorf("failed to create session: %w", err)
@@ -120,7 +120,7 @@ func (c *Client) Copy(ctx context.Context, reader io.Reader, remotePath string, 
 
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- session.Run(fmt.Sprintf("cat > %s && chmod %s %s", remotePath, mode, remotePath))
+		errCh <- session.Run(fmt.Sprintf("cat > %s && tar -xf %s", remotePath, remotePath))
 	}()
 
 	select {
