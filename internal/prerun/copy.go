@@ -1,4 +1,4 @@
-package build
+package prerun
 
 import (
 	"archive/tar"
@@ -22,32 +22,6 @@ func shouldIgnore(path string, ignore []string) bool {
 		}
 	}
 	return false
-}
-
-func writeToTar(path string, tw *tar.Writer, fi os.FileInfo) {
-	fr, _ := os.Open(path)
-	defer fr.Close()
-
-	h := new(tar.Header)
-	if fi.IsDir() {
-		h.Typeflag = tar.TypeDir
-	} else {
-		h.Typeflag = tar.TypeReg
-	}
-	root, _ := filepath.Abs("./")
-	rel, err := filepath.Rel(root, path)
-	if err != nil {
-		rel = path
-	}
-	h.Name = rel
-	h.Size = fi.Size()
-	h.Mode = int64(fi.Mode())
-	h.ModTime = fi.ModTime()
-	_ = tw.WriteHeader(h)
-
-	if !fi.IsDir() {
-		_, _ = io.Copy(tw, fr)
-	}
 }
 
 func getFilesToSend(ignore []string) []string {
@@ -87,39 +61,60 @@ func getFilesToSend(ignore []string) []string {
 	return files
 }
 
-func makeTarStream(files []string, w io.Writer) {
-	tw := tar.NewWriter(w)
-	defer tw.Close()
-
-	for _, file := range files {
-
-		fi, err := os.Stat(file)
-		if err != nil {
-			continue
-		}
-		writeToTar(file, tw, fi)
+func writeToTar(path string, tw *tar.Writer, fi os.FileInfo) error {
+	fr, err := os.Open(path)
+	if err != nil {
+		return err
 	}
-	ui.Info("Wrote files to tar stream")
+	defer fr.Close()
+
+	root, _ := filepath.Abs("./")
+	rel, _ := filepath.Rel(root, path)
+
+	h, err := tar.FileInfoHeader(fi, "")
+	if err != nil {
+		return err
+	}
+	h.Name = rel
+
+	if err := tw.WriteHeader(h); err != nil {
+		return err
+	}
+
+	if !fi.IsDir() {
+		_, err = io.Copy(tw, fr)
+		return err
+	}
+	return nil
 }
 
-func BuildTar() {
-	var meshConfig, err = parse.Mesh()
+func BuildTar() io.Reader {
+	meshConfig, err := parse.Mesh()
 	if err != nil {
 		ui.Error("Could not parse mesh.yaml")
-	}
-	var ignore = meshConfig.Ignore
-	files := getFilesToSend(ignore)
-	out, err := os.Create("mesh.tar")
-	if err != nil {
-		ui.Error("Could not make mesh.tar")
+		return nil
 	}
 
-	defer out.Close()
-	makeTarStream(files, out)
+	files := getFilesToSend(meshConfig.Ignore)
 
+	r, w := io.Pipe()
 
-}
+	go func() {
+		defer w.Close()
+		tw := tar.NewWriter(w)
+		defer tw.Close()
+		for _, file := range files {
+			fi, err := os.Stat(file)
+			if err != nil {
+				_ = w.CloseWithError(err)
+				return
+			}
+			if err := writeToTar(file, tw, fi); err != nil {
+				_ = w.CloseWithError(err)
+				return
+			}
+		}
+	}()
 
-func sendTar(){
-
+	return r
 }
