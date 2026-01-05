@@ -88,7 +88,23 @@ func runHost(command string) prerun.SSHCommand {
 
 		ui.Success(fmt.Sprintf("[%s] Pre-run commands executed", host))
 
-		// TODO: main command goes here and log streaming stuff
+		// run command and output to log file
+		logPath := fmt.Sprintf("%s/output.log", jobDir)
+		wrappedCommand := fmt.Sprintf("%s > %s 2>&1", command, logPath)
+
+		if err := client.ExecDetached(ctx, wrappedCommand); err != nil {
+			return fmt.Errorf("failed to execute command: %w", err)
+		}
+
+		ui.Success(fmt.Sprintf("[%s] Command started", host))
+
+		prefixWriter := ui.NewPrefixWriter(fmt.Sprintf("[%s] ", host), os.Stdout)
+		if err := client.Tail(ctx, logPath, prefixWriter); err != nil {
+			if ctx.Err() != nil {
+				return nil
+			}
+			return fmt.Errorf("failed to tail logs: %w", err)
+		}
 
 		// cleanup
 
