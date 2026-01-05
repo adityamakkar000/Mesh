@@ -14,14 +14,6 @@ import (
 
 type SSHCommand func(ctx context.Context, cluster *parse.NodeConfig, mesh *parse.MeshConfig, host string, host_id int) error
 
-type PreRunSSHMsgs struct {
-	HostSuccessMsg string
-	HostErrorMsg   string
-	SuccessMsg     string
-	ErrorMsg       string
-}
-
-
 func ParseConfigs(clusterName string) (*parse.NodeConfig, *parse.MeshConfig, error) {
 	clusters, err := parse.Clusters()
 	if err != nil {
