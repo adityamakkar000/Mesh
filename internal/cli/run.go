@@ -58,6 +58,9 @@ func run(clusterName, command string) error {
 
 func runHost(command string) prerun.SSHCommand {
 
+	var remote_dir = "job"
+	var mesh_file = "mesh.tar"
+	var log_file = "output.log"
 	return func(ctx context.Context, cluster *parse.NodeConfig, mesh *parse.MeshConfig, host string) error {
 
 		client, err := ssh.Connect(ctx, cluster.User, host, cluster.IdentityFile)
@@ -66,13 +69,12 @@ func runHost(command string) prerun.SSHCommand {
 		}
 		defer client.Close()
 
-		jobDir := "job"
-		if err := client.Exec(ctx, fmt.Sprintf("mkdir -p %s && rm -rf %s/*", jobDir, jobDir), io.Discard, io.Discard); err != nil {
+		if err := client.Exec(ctx, fmt.Sprintf("mkdir -p %s && rm -rf %s/*", remote_dir, remote_dir), io.Discard, io.Discard); err != nil {
 			return fmt.Errorf("failed to execute '%s': %w", command, err)
 		}
 
 		reader := prerun.BuildTar()
-		errCopy := client.SendTar(ctx, reader, fmt.Sprintf("%s/mesh.tar", jobDir))
+		errCopy := client.SendTar(ctx, reader, remote_dir, mesh_file)
 
 		if errCopy != nil {
 			return fmt.Errorf("failed to send files: %w", errCopy)
@@ -88,27 +90,22 @@ func runHost(command string) prerun.SSHCommand {
 
 		ui.Success(fmt.Sprintf("[%s] Pre-run commands executed", host))
 
-		// run command and output to log file
-		logPath := fmt.Sprintf("%s/output.log", jobDir)
-		wrappedCommand := fmt.Sprintf("%s > %s 2>&1", command, logPath)
 
-		if err := client.ExecDetached(ctx, wrappedCommand); err != nil {
+		if err := client.ExecDetached(ctx, command, remote_dir, log_file); err != nil {
 			return fmt.Errorf("failed to execute command: %w", err)
 		}
 
 		ui.Success(fmt.Sprintf("[%s] Command started", host))
 
 		prefixWriter := ui.NewPrefixWriter(fmt.Sprintf("[%s] ", host), os.Stdout)
-		if err := client.Tail(ctx, logPath, prefixWriter); err != nil {
+		if err := client.Tail(ctx, remote_dir, log_file, prefixWriter); err != nil {
 			if ctx.Err() != nil {
 				return nil
 			}
 			return fmt.Errorf("failed to tail logs: %w", err)
 		}
 
-		// cleanup
-
-		if err := client.Exec(ctx, fmt.Sprintf("rm -rf %s", jobDir), io.Discard, io.Discard); err != nil {
+		if err := client.Exec(ctx, "rm -rf job", io.Discard, io.Discard); err != nil {
 			return fmt.Errorf("failed to execute cleanup: %w", err)
 		}
 

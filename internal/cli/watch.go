@@ -8,9 +8,7 @@ import (
 	"strings"
 
 	"github.com/adityamakkar000/Mesh/internal/parse"
-	"github.com/adityamakkar000/Mesh/internal/prerun"
 	"github.com/adityamakkar000/Mesh/internal/ssh"
-	"github.com/adityamakkar000/Mesh/internal/ui"
 	"github.com/spf13/cobra"
 )
 
@@ -80,10 +78,11 @@ except Exception as _:
 
 func runWatch(clusterName string) error {
 
-	tpu_info, err := get_info(context.Background(), &parse.NodeConfig{}, &parse.MeshConfig{}, "")
+	_, err := get_info(context.Background(), &parse.NodeConfig{}, &parse.MeshConfig{}, "")
 	if err != nil {
 		return err
 	}
+	return nil
 
 }
 
@@ -97,7 +96,6 @@ type TPUINFO struct {
 	Count int 
 }
 
-for i in range(1)
 
 func get_info(
 	ctx context.Context,
