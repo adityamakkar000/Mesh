@@ -120,7 +120,7 @@ func (c *Client) SendTar(ctx context.Context, reader io.Reader, remotePath strin
 
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- session.Run(fmt.Sprintf("cat > %s && tar -xf %s", remotePath, remotePath))
+		errCh <- session.Run(fmt.Sprintf("cat > %s && cd %s && tar -xf %s", remotePath, remotePath, remotePath))
 	}()
 
 	select {
@@ -134,6 +134,21 @@ func (c *Client) SendTar(ctx context.Context, reader io.Reader, remotePath strin
 		}
 		return ctx.Err()
 	}
+}
+
+func (c *Client) RunCommandAndGetOutput(ctx context.Context, command string) (string, error) {
+	session, err := c.conn.NewSession()
+	if err != nil {
+		return "", fmt.Errorf("failed to create session: %w", err)
+	}
+	defer session.Close()
+
+	output, err := session.CombinedOutput(command)
+	if err != nil {
+		return "", fmt.Errorf("failed to run command: %w", err)
+	}
+
+	return string(output), nil
 }
 
 // Streams a remote file similar to tail -f
