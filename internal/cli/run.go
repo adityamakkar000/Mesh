@@ -15,6 +15,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var remote_dir = "job"
+var mesh_file = "mesh.tar"
+var log_file = "output.log"
+
 var runCmd = &cobra.Command{
 	Use:   "run",
 	Short: "Run a job",
@@ -46,22 +50,55 @@ func init() {
 }
 
 func run(clusterName, command string) error {
+	cluster, mesh, err := prerun.ParseConfigs(clusterName)
+	if err != nil {
+		return err
+	}
+	var hostLabel string
+	if len(cluster.Hosts) == 1 {
+		hostLabel = "host"
+	} else {
+		hostLabel = "hosts"
+	}
+	ui.Header(fmt.Sprintf("Launching run on '%s' (%d %s) with command '%s'", clusterName, len(cluster.Hosts), hostLabel, command))
 
-	error := prerun.RunPreRunSSH(clusterName, runHost(command), prerun.PreRunSSHMsgs{
-		HostSuccessMsg: "[%s] Run completed",
-		HostErrorMsg:   "[%s] Run failed: %v",
-		SuccessMsg:     "Cluster '%s' run complete",
-		ErrorMsg:       "run failed on %d host(s)",
-	})
-	return error
+	failures := prerun.RunOnAllHosts(cluster, mesh, runHost(command),
+		"[%s] Run completed",
+		"[%s] Run failed: %v",
+	)
+	if failures > 0 {
+		return fmt.Errorf("Run failed on %d hosts", failures)
+	}
+
+	cleanupFailures := prerun.RunOnAllHosts(cluster, mesh, runCleanupHost, 
+		"[%s] Cleanup completed",
+		"[%s] Cleanup failed: %v",
+	)
+	if cleanupFailures > 0 {
+		return fmt.Errorf("Cleanup failed on %d hosts", cleanupFailures)
+	}
+
+	ui.Success(fmt.Sprintf("Run completed on %s", clusterName))
+	return nil
+
+}
+func runCleanupHost(ctx context.Context, cluster *parse.NodeConfig, mesh *parse.MeshConfig, host string, host_id int) error {
+	client, err := ssh.Connect(ctx, cluster.User, host, cluster.IdentityFile)
+	if err != nil {
+		return fmt.Errorf("failed to connect: %w", err)
+	}
+	defer client.Close()
+	
+	// in theory this errors if the trainin job actually finished not sure why
+	// so just don't do error handling here
+	_ = client.Exec(ctx, fmt.Sprintf("pkill -9 python && rm -rf %s", remote_dir), io.Discard, io.Discard)
+	return nil
 }
 
-func runHost(command string) prerun.SSHCommand {
 
-	var remote_dir = "job"
-	var mesh_file = "mesh.tar"
-	var log_file = "output.log"
-	return func(ctx context.Context, cluster *parse.NodeConfig, mesh *parse.MeshConfig, host string) error {
+
+func runHost(command string) prerun.SSHCommand {
+	return func(ctx context.Context, cluster *parse.NodeConfig, mesh *parse.MeshConfig, host string, host_id int) error {
 
 		client, err := ssh.Connect(ctx, cluster.User, host, cluster.IdentityFile)
 		if err != nil {
@@ -82,34 +119,25 @@ func runHost(command string) prerun.SSHCommand {
 
 		ui.Success(fmt.Sprintf("[%s] Directory built and copied", host))
 
+		var prerun_final_command []string 
+
 		for _, command := range mesh.Prerun {
-			if err := client.Exec(ctx, command, io.Discard, io.Discard); err != nil {
-				return fmt.Errorf("failed to execute '%s': %w", command, err)
-			}
+			prerun_final_command = append(prerun_final_command, command)
 		}
 
-		ui.Success(fmt.Sprintf("[%s] Pre-run commands executed", host))
-
-
-		if err := client.ExecDetached(ctx, command, remote_dir, log_file); err != nil {
+		if err := client.ExecDetached(ctx, prerun_final_command, command, remote_dir, log_file, host_id); err != nil {
 			return fmt.Errorf("failed to execute command: %w", err)
 		}
 
-		ui.Success(fmt.Sprintf("[%s] Command started", host))
+		ui.Success(fmt.Sprintf("[%s] Command launched", host))
 
-		prefixWriter := ui.NewPrefixWriter(fmt.Sprintf("[%s] ", host), os.Stdout)
+		prefixWriter := ui.NewPrefixWriter(fmt.Sprintf("[%s] ", host), os.Stdout, host_id)
 		if err := client.Tail(ctx, remote_dir, log_file, prefixWriter); err != nil {
 			if ctx.Err() != nil {
 				return nil
 			}
 			return fmt.Errorf("failed to tail logs: %w", err)
 		}
-
-		if err := client.Exec(ctx, "rm -rf job", io.Discard, io.Discard); err != nil {
-			return fmt.Errorf("failed to execute cleanup: %w", err)
-		}
-
-		ui.Success(fmt.Sprintf("[%s] Cleaned up job directory", host))
 
 		return nil
 

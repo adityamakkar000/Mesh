@@ -2,17 +2,17 @@ commands:
   - echo "test 123"
   - sleep 3
   - echo "streaming works"
+  - curl -LsSf https://astral.sh/uv/install.sh | sh
 
 ignore:
   - "*.pyc"
-  - "__pycache__/"
-  - ".git/"
+  - "*/__pycache__/*"
+  - "./git/*"
   - ".env"
-  - "node.yaml"
   - "mesh.yaml"
-  - "*/build/*"
+  - "*/prerun/*"
 
 prerun:
-  - echo "Starting setup..."
-  - whoami
-  - hostname
+  - uv venv --python 3.12 --clear
+  - source .venv/bin/activate
+  - uv pip install loguru 'jax[tpu]'

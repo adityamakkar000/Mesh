@@ -12,7 +12,7 @@ import (
 	"github.com/adityamakkar000/Mesh/internal/ui"
 )
 
-type SSHCommand func(ctx context.Context, cluster *parse.NodeConfig, mesh *parse.MeshConfig, host string) error
+type SSHCommand func(ctx context.Context, cluster *parse.NodeConfig, mesh *parse.MeshConfig, host string, host_id int) error
 
 type PreRunSSHMsgs struct {
 	HostSuccessMsg string
@@ -21,28 +21,32 @@ type PreRunSSHMsgs struct {
 	ErrorMsg       string
 }
 
-func RunPreRunSSH(clusterName string, fn SSHCommand, msgs PreRunSSHMsgs) error {
+
+func ParseConfigs(clusterName string) (*parse.NodeConfig, *parse.MeshConfig, error) {
 	clusters, err := parse.Clusters()
 	if err != nil {
-		return ui.ErrorWrap(err, "failed to parse cluster.yaml")
+		return nil, nil, ui.ErrorWrap(err, "failed to parse cluster.yaml")
 	}
 
-	cluster, ok := clusters[clusterName]
+	cluster, ok := (clusters)[clusterName]
 	if !ok {
-		return ui.ErrorWrap(fmt.Errorf("cluster not found"), "cluster '%s' not found in cluster.yaml", clusterName)
+		return nil, nil, ui.ErrorWrap(fmt.Errorf("cluster not found"), "cluster '%s' not found in cluster.yaml", clusterName)
 	}
 
 	mesh, err := parse.Mesh()
 	if err != nil {
-		return ui.ErrorWrap(err, "failed to parse mesh.yaml")
+		return nil, nil, ui.ErrorWrap(err, "failed to parse mesh.yaml")
 	}
 
 	if len(mesh.Commands) == 0 {
 		ui.Info("No commands to run in mesh.yaml")
-		return nil
 	}
 
-	ui.Header(fmt.Sprintf("Setting up cluster '%s' (%d hosts)", clusterName, len(cluster.Hosts)))
+	return &cluster, mesh, nil
+
+}
+
+func RunOnAllHosts(cluster *parse.NodeConfig, mesh *parse.MeshConfig, mainfn SSHCommand, sucess_message, error_message string) int {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -62,20 +66,18 @@ func RunPreRunSSH(clusterName string, fn SSHCommand, msgs PreRunSSHMsgs) error {
 	var mu sync.Mutex
 	failures := 0
 
-	for _, host := range cluster.Hosts {
+	for id, host := range cluster.Hosts {
 		wg.Add(1)
 		go func(host string) {
 			defer wg.Done()
 
-			if err := fn(ctx, &cluster, mesh, host); err != nil {
+			if err := mainfn(ctx, cluster, mesh, host, id); err != nil {
 				mu.Lock()
 				failures++
 				mu.Unlock()
-				// ui.Error(fmt.Sprintf("[%s] setup failed: %v", host, err))
-				ui.Error(fmt.Sprintf(msgs.HostErrorMsg, host, err))
+				ui.Error(fmt.Sprintf(error_message, host, err))
 			} else {
-				// ui.Success(fmt.Sprintf("[%s] setup completed", host))
-				ui.Success(fmt.Sprintf(msgs.HostSuccessMsg, host))
+				ui.Success(fmt.Sprintf(sucess_message, host))
 			}
 		}(host)
 	}
@@ -83,10 +85,7 @@ func RunPreRunSSH(clusterName string, fn SSHCommand, msgs PreRunSSHMsgs) error {
 	wg.Wait()
 	signal.Stop(sigChan)
 
-	if failures > 0 {
-		return fmt.Errorf(msgs.ErrorMsg, failures)
-	}
-
-	ui.Success(fmt.Sprintf(msgs.SuccessMsg, clusterName))
-	return nil
+	return failures
 }
+
+

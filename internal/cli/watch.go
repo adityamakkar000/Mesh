@@ -93,16 +93,15 @@ type TPUInfo struct {
 
 type TPUINFO struct {
 	ChipType string
-	Count int 
+	Count    int
 }
-
 
 func get_info(
 	ctx context.Context,
 	cluster *parse.NodeConfig,
 	mesh *parse.MeshConfig,
 	host string,
-) (TPUInfo, error) {	
+) (TPUInfo, error) {
 	client, err := ssh.Connect(ctx, cluster.User, host, cluster.IdentityFile)
 	if err != nil {
 		return TPUInfo{}, fmt.Errorf("failed to connect: %w", err)
@@ -118,7 +117,7 @@ uv pip install 'jax[tpu]' > /dev/null 2>&1 &&
 python << 'EOF'
 %s
 EOFk`, get_tpu_info_cmd,
-)
+	)
 	output, err := client.RunCommandAndGetOutput(ctx, cmd)
 	if err != nil {
 		return TPUInfo{}, fmt.Errorf("failed to run tpu info command: %w", err)
@@ -129,7 +128,7 @@ EOFk`, get_tpu_info_cmd,
 		return TPUInfo{}, fmt.Errorf("invalid tpu info output")
 	}
 	chipType := lines[0] + " " + lines[1]
-	
+
 	count, err := strconv.Atoi(strings.TrimSpace(lines[3]))
 	if err != nil {
 		return TPUInfo{}, fmt.Errorf("failed to parse chip count: %w", err)

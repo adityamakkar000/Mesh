@@ -39,7 +39,8 @@ func getFilesToSend(ignore []string) []string {
 			return err
 		}
 
-		if shouldIgnore(path, ignore) {
+		relativePath, err := filepath.Rel(root, path)
+		if shouldIgnore(relativePath, ignore) {
 			if d.IsDir() {
 				return fs.SkipDir
 			}

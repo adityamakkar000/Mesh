@@ -9,6 +9,7 @@ import (
 	"github.com/adityamakkar000/Mesh/internal/parse"
 	"github.com/adityamakkar000/Mesh/internal/prerun"
 	"github.com/adityamakkar000/Mesh/internal/ssh"
+	"github.com/adityamakkar000/Mesh/internal/ui"
 	"github.com/spf13/cobra"
 )
 
@@ -37,16 +38,27 @@ func init() {
 }
 
 func runSetup(clusterName string) error {
-	error := prerun.RunPreRunSSH(clusterName, setupHost, prerun.PreRunSSHMsgs{
-		HostSuccessMsg: "[%s] setup completed",
-		HostErrorMsg:   "[%s] setup failed: %v",
-		SuccessMsg:     "Cluster '%s' setup complete",
-		ErrorMsg:       "setup failed on %d host(s)",
-	})
-	return error
+
+	cluster, mesh, err := prerun.ParseConfigs(clusterName)
+	if err != nil {
+		return err
+	}
+	ui.Header(fmt.Sprintf("Setting up cluster '%s' (%d hosts)", clusterName, len(cluster.Hosts)))
+
+	failures := prerun.RunOnAllHosts(cluster, mesh, setupHost,
+		"[%s] setup completed",
+		"[%s] setup failed: %v",
+	)
+	if failures > 0 {
+		return fmt.Errorf("setup failed on %d hosts", failures)
+	}
+
+	ui.Success(fmt.Sprintf("Cluster '%s' setup complete", clusterName))
+	return nil
 }
 
-func setupHost(ctx context.Context, cluster *parse.NodeConfig, mesh *parse.MeshConfig, host string) error {
+func setupHost(ctx context.Context, cluster *parse.NodeConfig, mesh *parse.MeshConfig, host string, host_id int) error {
+	// host_id is useless for this function
 	client, err := ssh.Connect(ctx, cluster.User, host, cluster.IdentityFile)
 	if err != nil {
 		return fmt.Errorf("failed to connect: %w", err)

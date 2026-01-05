@@ -6,6 +6,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"strings"
 	"time"
 
 	"golang.org/x/crypto/ssh"
@@ -85,19 +86,25 @@ func (c *Client) Exec(ctx context.Context, command string, stdout, stderr io.Wri
 	}
 }
 
+
+
 // Asynchronous execution of a command (exec-and-forget)
-func (c *Client) ExecDetached(ctx context.Context, command, remoteDir, log_file string) error {
+func (c *Client) ExecDetached(ctx context.Context, prerun_commands []string, command, remoteDir, log_file string, host_id int) error {
 	session, err := c.conn.NewSession()
 	if err != nil {
 		return fmt.Errorf("failed to create session: %w", err)
 	}
 	defer session.Close()
+	var pre_run_joined_command = strings.Join(prerun_commands, " && ")
 
 	wrapped := fmt.Sprintf(`
+export PATH="$HOME/.local/bin:$PATH"
+export RANK=%d
 cd %s 
+%s
 setsid %s > %s 2>&1 < /dev/null &
 echo $! > job.pid
-`, remoteDir, command, log_file)
+`, host_id, remoteDir, pre_run_joined_command, command,log_file)
 
 	errCh := make(chan error, 1)
 	go func() {
@@ -165,11 +172,7 @@ func (c *Client) Tail(ctx context.Context, remoteDir, remoteFile string, stdout 
 
 	session.Stdout = stdout
 
-	cmd := fmt.Sprintf(`
-cd %s
-PID=$(cat job.pid)
-tail --pid=$PID -f %s
-`, remoteDir, remoteFile)
+	cmd := fmt.Sprintf(`cd %s && PID=$(cat job.pid) && tail --pid=$PID -f %s`, remoteDir, remoteFile)
 
 	errCh := make(chan error, 1)
 	go func() {
