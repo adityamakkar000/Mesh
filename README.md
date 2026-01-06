@@ -2,7 +2,7 @@
 
 # *MESH*
 
-**A Multi Host Orchestrator for JAX**
+**A Multi Host JAX Orchestrator **
 
 <br>
 
