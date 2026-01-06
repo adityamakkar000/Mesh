@@ -29,7 +29,7 @@ Example:
   mesh run my-cluster python main.py --lr 1e-3
 
 Note it passes in the rank of the process so host x will run on each cluster 'RANK=x python main.py --lr 1e-3'
-Be sure to initalize JAX with induvial ranks using ENV variables to display proper logs from process 0
+Be sure to initialize JAX with individual ranks using ENV variables to display proper logs from process 0
 `,
 	Args: cobra.MinimumNArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
@@ -70,7 +70,7 @@ func run(clusterName, command string) error {
 		return fmt.Errorf("Run failed on %d hosts", failures)
 	}
 
-	cleanupFailures := prerun.RunOnAllHosts(cluster, mesh, runCleanupHost, 
+	cleanupFailures := prerun.RunOnAllHosts(cluster, mesh, runCleanupHost,
 		"[%s] Cleanup completed",
 		"[%s] Cleanup failed: %v",
 	)
@@ -88,14 +88,12 @@ func runCleanupHost(ctx context.Context, cluster *parse.NodeConfig, mesh *parse.
 		return fmt.Errorf("failed to connect: %w", err)
 	}
 	defer client.Close()
-	
+
 	// in theory this errors if the trainin job actually finished not sure why
 	// so just don't do error handling here
 	_ = client.Exec(ctx, fmt.Sprintf("pkill -9 python && rm -rf %s", remote_dir), io.Discard, io.Discard)
 	return nil
 }
-
-
 
 func runHost(command string) prerun.SSHCommand {
 	return func(ctx context.Context, cluster *parse.NodeConfig, mesh *parse.MeshConfig, host string, host_id int) error {
@@ -119,7 +117,7 @@ func runHost(command string) prerun.SSHCommand {
 
 		ui.Success(fmt.Sprintf("[%s] Directory built and copied", host))
 
-		var prerun_final_command []string 
+		var prerun_final_command []string
 
 		for _, command := range mesh.Prerun {
 			prerun_final_command = append(prerun_final_command, command)

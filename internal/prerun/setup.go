@@ -79,5 +79,3 @@ func RunOnAllHosts(cluster *parse.NodeConfig, mesh *parse.MeshConfig, mainfn SSH
 
 	return failures
 }
-
-

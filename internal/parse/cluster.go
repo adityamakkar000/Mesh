@@ -61,6 +61,6 @@ func Clusters() (ClusterMap, error) {
 		cluster_names = append(cluster_names, k)
 	}
 	ui.Info(fmt.Sprintf("available clusters: %v", cluster_names))
-	
+
 	return clusters, nil
 }

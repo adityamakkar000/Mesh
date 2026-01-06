@@ -35,7 +35,7 @@ func (w *PrefixWriter) Write(p []byte) (n int, err error) {
 		if i == len(lines)-1 && line == "" {
 			break
 		}
-		if w.hostId == 0 { 
+		if w.hostId == 0 {
 			if _, err := fmt.Fprintf(w.out, "%s%s%s\n", w.prefix, line, Reset); err != nil {
 				return 0, err
 			}
