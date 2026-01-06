@@ -5,7 +5,7 @@ set -euo pipefail
 REPO="https://github.com/adityamakkar000/mesh"
 BIN_NAME="mesh"
 INSTALL_DIR="${HOME}/.local/bin"
-GO_MIN_VERSION="1.21"   # adjust as needed
+GO_MIN_VERSION="1.21"  
 
 echo "==> Installing $BIN_NAME CLI"
 
@@ -35,7 +35,6 @@ go build -trimpath -o "${BIN_NAME}" ./cmd/mesh/main.go
 echo "Installing to $INSTALL_DIR"
 mv "${BIN_NAME}" "$INSTALL_DIR/"
 
-# 5) Ensure PATH
 if ! echo "$PATH" | grep -q "$INSTALL_DIR"; then
   SHELL_RC="$HOME/.zshrc"
   echo "Adding $INSTALL_DIR to PATH in $SHELL_RC"
