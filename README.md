@@ -1,14 +1,24 @@
 <div align="center">
 
 # *MESH*
-
-**A Multi-Host JAX Orchestrator**
+<img src="public/mesh.png" alt="MESH logo" width="256" height="256" />
 
 <br>
 
-<img src="public/mesh.png" alt="MESH logo" width="256" height="256" />
+
+**A Multi-Host JAX Orchestrator**
 
 </div>
+
+
+## Install
+
+Currently only supported on MacOS right now. 
+
+1. Install using `curl -fsSL https://raw.githubusercontent.com/adityamakkar000/mesh/main/scripts/install.sh | bash`
+2. Build from source `git clone https://github.com/adityamakkar000/Mesh.git && cd Mesh && bash scripts/install.sh`
+
+Afterwards source your `.zshrc`
 
 ## Setup
 
