@@ -14,8 +14,8 @@ type MeshConfig struct {
 	Prerun   []string `yaml:"prerun"`
 }
 
-func Mesh(path string) (*MeshConfig, error) {
-	filename, err := filepath.Abs(path)
+func Mesh() (*MeshConfig, error) {
+	filename, err := filepath.Abs("./mesh.yaml")
 	if err != nil {
 		return nil, err
 	}

@@ -18,12 +18,14 @@ const (
 type PrefixWriter struct {
 	prefix string
 	out    io.Writer
+	hostId int
 }
 
-func NewPrefixWriter(prefix string, out io.Writer) *PrefixWriter {
+func NewPrefixWriter(prefix string, out io.Writer, host_id int) *PrefixWriter {
 	return &PrefixWriter{
 		prefix: prefix,
 		out:    out,
+		hostId: host_id,
 	}
 }
 
@@ -33,8 +35,10 @@ func (w *PrefixWriter) Write(p []byte) (n int, err error) {
 		if i == len(lines)-1 && line == "" {
 			break
 		}
-		if _, err := fmt.Fprintf(w.out, "%s%s%s\n", w.prefix, line, Reset); err != nil {
-			return 0, err
+		if w.hostId == 0 {
+			if _, err := fmt.Fprintf(w.out, "%s%s%s\n", w.prefix, line, Reset); err != nil {
+				return 0, err
+			}
 		}
 	}
 	return len(p), nil

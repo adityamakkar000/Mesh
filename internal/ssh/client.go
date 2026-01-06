@@ -6,6 +6,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"strings"
 	"time"
 
 	"golang.org/x/crypto/ssh"
@@ -86,14 +87,22 @@ func (c *Client) Exec(ctx context.Context, command string, stdout, stderr io.Wri
 }
 
 // Asynchronous execution of a command (exec-and-forget)
-func (c *Client) ExecDetached(ctx context.Context, command string) error {
+func (c *Client) ExecDetached(ctx context.Context, prerun_commands []string, command, remoteDir, log_file string, host_id int) error {
 	session, err := c.conn.NewSession()
 	if err != nil {
 		return fmt.Errorf("failed to create session: %w", err)
 	}
 	defer session.Close()
+	var pre_run_joined_command = strings.Join(prerun_commands, " && ")
 
-	wrapped := fmt.Sprintf("setsid %s > /dev/null 2>&1 < /dev/null &", command)
+	wrapped := fmt.Sprintf(`
+export PATH="$HOME/.local/bin:$PATH"
+export RANK=%d
+cd %s 
+%s
+setsid %s > %s 2>&1 < /dev/null &
+echo $! > job.pid
+`, host_id, remoteDir, pre_run_joined_command, command, log_file)
 
 	errCh := make(chan error, 1)
 	go func() {
@@ -109,7 +118,7 @@ func (c *Client) ExecDetached(ctx context.Context, command string) error {
 }
 
 // Transfers data from a reader to a remote file path
-func (c *Client) Copy(ctx context.Context, reader io.Reader, remotePath string, mode string) error {
+func (c *Client) SendTar(ctx context.Context, reader io.Reader, remote_dir, file_name string) error {
 	session, err := c.conn.NewSession()
 	if err != nil {
 		return fmt.Errorf("failed to create session: %w", err)
@@ -120,7 +129,7 @@ func (c *Client) Copy(ctx context.Context, reader io.Reader, remotePath string, 
 
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- session.Run(fmt.Sprintf("cat > %s && chmod %s %s", remotePath, mode, remotePath))
+		errCh <- session.Run(fmt.Sprintf("cat > %s/%s && cd %s && tar -xf %s", remote_dir, file_name, remote_dir, file_name))
 	}()
 
 	select {
@@ -136,8 +145,23 @@ func (c *Client) Copy(ctx context.Context, reader io.Reader, remotePath string, 
 	}
 }
 
+func (c *Client) RunCommandAndGetOutput(ctx context.Context, command string) (string, error) {
+	session, err := c.conn.NewSession()
+	if err != nil {
+		return "", fmt.Errorf("failed to create session: %w", err)
+	}
+	defer session.Close()
+
+	output, err := session.CombinedOutput(command)
+	if err != nil {
+		return "", fmt.Errorf("failed to run command: %w", err)
+	}
+
+	return string(output), nil
+}
+
 // Streams a remote file similar to tail -f
-func (c *Client) Tail(ctx context.Context, remotePath string, stdout io.Writer) error {
+func (c *Client) Tail(ctx context.Context, remoteDir, remoteFile string, stdout io.Writer) error {
 	session, err := c.conn.NewSession()
 	if err != nil {
 		return fmt.Errorf("failed to create session: %w", err)
@@ -146,9 +170,11 @@ func (c *Client) Tail(ctx context.Context, remotePath string, stdout io.Writer) 
 
 	session.Stdout = stdout
 
+	cmd := fmt.Sprintf(`cd %s && PID=$(cat job.pid) && tail --pid=$PID -f %s`, remoteDir, remoteFile)
+
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- session.Run(fmt.Sprintf("tail -f %s", remotePath))
+		errCh <- session.Run(cmd)
 	}()
 
 	select {

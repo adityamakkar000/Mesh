@@ -6,9 +6,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"gopkg.in/yaml.v3"
 	"github.com/adityamakkar000/Mesh/internal/config"
 	"github.com/adityamakkar000/Mesh/internal/ui"
+	"gopkg.in/yaml.v3"
 )
 
 type NodeConfig struct {
@@ -38,14 +38,14 @@ func Clusters() (ClusterMap, error) {
 	for k := range clusters {
 		var n_hosts = len(clusters[k].Hosts)
 		if n_hosts == 0 {
-            ui.Error(fmt.Sprintf("expected cluster %s to have at least 1 IP got 0", k))
+			ui.Error(fmt.Sprintf("expected cluster %s to have at least 1 IP got 0", k))
 			delete(clusters, k)
 			continue
 		}
 
 		for _, host := range clusters[k].Hosts {
 			if net.ParseIP(host) == nil {
-                ui.Error(fmt.Sprintf("invalid IP address %s in cluster %s", host, k))
+				ui.Error(fmt.Sprintf("invalid IP address %s in cluster %s", host, k))
 				delete(clusters, k)
 				break
 			}
