@@ -1,5 +1,14 @@
-# Mesh
-MESH: A Multi Host Orchestrator for JAX
+<div align="center">
+
+# *MESH*
+
+**A Multi Host Orchestrator for JAX**
+
+<br>
+
+<img src="public/mesh.png" alt="MESH logo" width="256" height="256" />
+
+</div>
 
 
 ## Setup
