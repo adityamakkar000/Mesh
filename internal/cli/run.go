@@ -28,6 +28,8 @@ from ./mesh.yaml.
 
 Example:
   mesh run my-cluster python main.py --lr 1e-3
+  OR
+  mesh run my-cluster --server
 
 Note it passes in the rank of the process so host x will run on each cluster 'RANK=x python main.py --lr 1e-3'
 Be sure to initialize JAX with individual ranks using ENV variables to display proper logs from process 0
