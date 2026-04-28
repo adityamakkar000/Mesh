@@ -31,10 +31,14 @@ Example:
 Note it passes in the rank of the process so host x will run on each cluster 'RANK=x python main.py --lr 1e-3'
 Be sure to initialize JAX with individual ranks using ENV variables to display proper logs from process 0
 `,
-	Args: cobra.MinimumNArgs(2),
+	Args: cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		clusterName := args[0]
 		command := strings.Join(args[1:], " ")
+		if command == "" {
+			command = "true"
+			ui.Warn(fmt.Sprintf("No command provided for cluster '%s'; running default no-op command '%s'.", clusterName, command))
+		}
 		ui.Info(fmt.Sprintf("Running command: %s", command))
 		var code = 0
 		if err := run(clusterName, command); err != nil {
