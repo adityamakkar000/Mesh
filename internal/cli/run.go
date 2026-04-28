@@ -18,6 +18,7 @@ import (
 var remote_dir = "job"
 var mesh_file = "mesh.tar"
 var log_file = "output.log"
+var runServerOnly bool
 
 var runCmd = &cobra.Command{
 	Use:   "run",
@@ -31,11 +32,19 @@ Example:
 Note it passes in the rank of the process so host x will run on each cluster 'RANK=x python main.py --lr 1e-3'
 Be sure to initialize JAX with individual ranks using ENV variables to display proper logs from process 0
 `,
-	Args: cobra.MinimumNArgs(2),
+	Args: func(cmd *cobra.Command, args []string) error {
+		if runServerOnly {
+			return cobra.ExactArgs(1)(cmd, args)
+		}
+		return cobra.MinimumNArgs(2)(cmd, args)
+	},
 	Run: func(cmd *cobra.Command, args []string) {
 		clusterName := args[0]
-		command := strings.Join(args[1:], " ")
-		ui.Info(fmt.Sprintf("Running command: %s", command))
+		command := ""
+		if !runServerOnly {
+			command = strings.Join(args[1:], " ")
+			ui.Info(fmt.Sprintf("Running command: %s", command))
+		}
 		var code = 0
 		if err := run(clusterName, command); err != nil {
 			code = 1
@@ -47,6 +56,7 @@ Be sure to initialize JAX with individual ranks using ENV variables to display p
 
 func init() {
 	rootCmd.AddCommand(runCmd)
+	runCmd.Flags().BoolVar(&runServerOnly, "server", false, "run only mesh.yaml server commands")
 }
 
 func run(clusterName, command string) error {
@@ -60,6 +70,25 @@ func run(clusterName, command string) error {
 	} else {
 		hostLabel = "hosts"
 	}
+
+	if runServerOnly {
+		ui.Header(fmt.Sprintf("Launching server-only run on '%s' (%d %s)", clusterName, len(cluster.Hosts), hostLabel))
+		if len(mesh.Server) == 0 {
+			return fmt.Errorf("no 'server' commands specified in mesh.yaml")
+		}
+
+		failures := prerun.RunOnAllHosts(cluster, mesh, runServerHost,
+			"[%s] Server commands completed",
+			"[%s] Server commands failed: %v",
+		)
+		if failures > 0 {
+			return fmt.Errorf("Server run failed on %d hosts", failures)
+		}
+
+		ui.Success(fmt.Sprintf("Server-only run completed on %s", clusterName))
+		return nil
+	}
+
 	ui.Header(fmt.Sprintf("Launching run on '%s' (%d %s) with command '%s'", clusterName, len(cluster.Hosts), hostLabel, command))
 
 	failures := prerun.RunOnAllHosts(cluster, mesh, runHost(command),
@@ -82,6 +111,23 @@ func run(clusterName, command string) error {
 	return nil
 
 }
+func runServerHost(ctx context.Context, cluster *parse.NodeConfig, mesh *parse.MeshConfig, host string, host_id int) error {
+	_ = host_id // not used in server-only mode
+	client, err := ssh.Connect(ctx, cluster.User, host, cluster.IdentityFile)
+	if err != nil {
+		return fmt.Errorf("failed to connect: %w", err)
+	}
+	defer client.Close()
+
+	for _, command := range mesh.Server {
+		if err := client.Exec(ctx, command, io.Discard, io.Discard); err != nil {
+			return fmt.Errorf("failed to execute '%s': %w", command, err)
+		}
+	}
+
+	return nil
+}
+
 func runCleanupHost(ctx context.Context, cluster *parse.NodeConfig, mesh *parse.MeshConfig, host string, host_id int) error {
 	client, err := ssh.Connect(ctx, cluster.User, host, cluster.IdentityFile)
 	if err != nil {

@@ -12,6 +12,7 @@ type MeshConfig struct {
 	Commands []string `yaml:"commands"`
 	Ignore   []string `yaml:"ignore"`
 	Prerun   []string `yaml:"prerun"`
+	Server   []string `yaml:"server"`
 }
 
 func Mesh() (*MeshConfig, error) {
