@@ -24,22 +24,16 @@ func shouldIgnore(path string, ignore []string) bool {
 	return false
 }
 
-func getFilesToSend(ignore []string) []string {
+func getFilesToSend(copyRoot string, ignore []string) []string {
 
 	var files []string
 
-	root, err := filepath.Abs("./")
-	if err != nil {
-		ui.ErrorWrap(err, "failed to get absolute path of current directory")
-		return files
-	}
-
-	errWalk := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+	errWalk := filepath.WalkDir(copyRoot, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
 
-		relativePath, err := filepath.Rel(root, path)
+		relativePath, err := filepath.Rel(copyRoot, path)
 		if shouldIgnore(relativePath, ignore) {
 			if d.IsDir() {
 				return fs.SkipDir
@@ -62,15 +56,14 @@ func getFilesToSend(ignore []string) []string {
 	return files
 }
 
-func writeToTar(path string, tw *tar.Writer, fi os.FileInfo) error {
+func writeToTar(copyRoot, path string, tw *tar.Writer, fi os.FileInfo) error {
 	fr, err := os.Open(path)
 	if err != nil {
 		return err
 	}
 	defer fr.Close()
 
-	root, _ := filepath.Abs("./")
-	rel, _ := filepath.Rel(root, path)
+	rel, _ := filepath.Rel(copyRoot, path)
 
 	h, err := tar.FileInfoHeader(fi, "")
 	if err != nil {
@@ -89,14 +82,20 @@ func writeToTar(path string, tw *tar.Writer, fi os.FileInfo) error {
 	return nil
 }
 
-func BuildTar() io.Reader {
-	meshConfig, err := parse.Mesh()
+func BuildTar(meshYAMLDir string) io.Reader {
+	meshConfig, err := parse.Mesh(meshYAMLDir)
 	if err != nil {
 		ui.Error("Could not parse mesh.yaml")
 		return nil
 	}
 
-	files := getFilesToSend(meshConfig.Ignore)
+	copyRoot, err := filepath.Abs(".")
+	if err != nil {
+		ui.ErrorWrap(err, "failed to get absolute path of current directory for upload")
+		return nil
+	}
+
+	files := getFilesToSend(copyRoot, meshConfig.Ignore)
 
 	r, w := io.Pipe()
 
@@ -110,7 +109,7 @@ func BuildTar() io.Reader {
 				_ = w.CloseWithError(err)
 				return
 			}
-			if err := writeToTar(file, tw, fi); err != nil {
+			if err := writeToTar(copyRoot, file, tw, fi); err != nil {
 				_ = w.CloseWithError(err)
 				return
 			}

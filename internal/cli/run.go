@@ -23,10 +23,12 @@ var runCmd = &cobra.Command{
 	Use:   "run",
 	Short: "Run a job",
 	Long: `Run a command on the cluster, mimicking a single host with pre-run commands
-from ./mesh.yaml.
+from mesh.yaml. Use --dir to read mesh.yaml from another directory; files uploaded to
+hosts are always taken from the directory you run mesh from (the process working directory).
 
 Example:
   mesh run my-cluster python main.py --lr 1e-3
+  mesh run --dir /path/to/configs my-cluster python main.py
 
 Note it passes in the rank of the process so host x will run on each cluster 'RANK=x python main.py --lr 1e-3'
 Be sure to initialize JAX with individual ranks using ENV variables to display proper logs from process 0
@@ -40,8 +42,13 @@ Be sure to initialize JAX with individual ranks using ENV variables to display p
 			ui.Warn(fmt.Sprintf("No command provided for cluster '%s'; running default no-op command '%s'.", clusterName, command))
 		}
 		ui.Info(fmt.Sprintf("Running command: %s", command))
+		meshYAMLDir, err := resolveMeshYAMLDir()
+		if err != nil {
+			ui.Error(err.Error())
+			os.Exit(1)
+		}
 		var code = 0
-		if err := run(clusterName, command); err != nil {
+		if err := run(clusterName, command, meshYAMLDir); err != nil {
 			code = 1
 		}
 		os.Exit(code)
@@ -50,11 +57,12 @@ Be sure to initialize JAX with individual ranks using ENV variables to display p
 }
 
 func init() {
+	runCmd.Flags().StringVar(&meshYAMLDirFlag, "dir", "", "directory containing mesh.yaml to use (default: current directory); upload tree is still the cwd where you invoke mesh")
 	rootCmd.AddCommand(runCmd)
 }
 
-func run(clusterName, command string) error {
-	cluster, mesh, err := prerun.ParseConfigs(clusterName)
+func run(clusterName, command, meshYAMLDir string) error {
+	cluster, mesh, err := prerun.ParseConfigs(clusterName, meshYAMLDir)
 	if err != nil {
 		return err
 	}
@@ -66,7 +74,7 @@ func run(clusterName, command string) error {
 	}
 	ui.Header(fmt.Sprintf("Launching run on '%s' (%d %s) with command '%s'", clusterName, len(cluster.Hosts), hostLabel, command))
 
-	failures := prerun.RunOnAllHosts(cluster, mesh, runHost(command),
+	failures := prerun.RunOnAllHosts(cluster, mesh, runHost(meshYAMLDir, command),
 		"[%s] Run completed",
 		"[%s] Run failed: %v",
 	)
@@ -99,7 +107,7 @@ func runCleanupHost(ctx context.Context, cluster *parse.NodeConfig, mesh *parse.
 	return nil
 }
 
-func runHost(command string) prerun.SSHCommand {
+func runHost(meshYAMLDir, command string) prerun.SSHCommand {
 	return func(ctx context.Context, cluster *parse.NodeConfig, mesh *parse.MeshConfig, host string, host_id int) error {
 
 		client, err := ssh.Connect(ctx, cluster.User, host, cluster.IdentityFile)
@@ -108,11 +116,11 @@ func runHost(command string) prerun.SSHCommand {
 		}
 		defer client.Close()
 
-		if err := client.Exec(ctx, fmt.Sprintf("mkdir -p %s && rm -rf %s/*", remote_dir, remote_dir), io.Discard, io.Discard); err != nil {
+		if err := client.Exec(ctx, fmt.Sprintf("rm -rf %s && mkdir -p %s", remote_dir, remote_dir), io.Discard, io.Discard); err != nil {
 			return fmt.Errorf("failed to execute '%s': %w", command, err)
 		}
 
-		reader := prerun.BuildTar()
+		reader := prerun.BuildTar(meshYAMLDir)
 		errCopy := client.SendTar(ctx, reader, remote_dir, mesh_file)
 
 		if errCopy != nil {

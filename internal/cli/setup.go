@@ -17,16 +17,23 @@ var setupCmd = &cobra.Command{
 	Use:   "setup <cluster_name>",
 	Short: "Setup a cluster from mesh.yaml configuration",
 	Long: `Setup a cluster by reading cluster info from ~/.config/mesh/cluster.yaml
-and setup commands from ./mesh.yaml.
+and setup commands from mesh.yaml. Use --dir to read mesh.yaml from another directory
+(default: current directory).
 
 Example:
-  mesh setup my-cluster`,
+  mesh setup my-cluster
+  mesh setup --dir /path/to/configs my-cluster`,
 	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		clusterName := args[0]
 
+		meshYAMLDir, err := resolveMeshYAMLDir()
+		if err != nil {
+			ui.Error(err.Error())
+			os.Exit(1)
+		}
 		var code = 0
-		if err := runSetup(clusterName); err != nil {
+		if err := runSetup(clusterName, meshYAMLDir); err != nil {
 			code = 1
 		}
 		os.Exit(code)
@@ -34,12 +41,13 @@ Example:
 }
 
 func init() {
+	setupCmd.Flags().StringVar(&meshYAMLDirFlag, "dir", "", "directory containing mesh.yaml to use (default: current directory)")
 	rootCmd.AddCommand(setupCmd)
 }
 
-func runSetup(clusterName string) error {
+func runSetup(clusterName, meshYAMLDir string) error {
 
-	cluster, mesh, err := prerun.ParseConfigs(clusterName)
+	cluster, mesh, err := prerun.ParseConfigs(clusterName, meshYAMLDir)
 	if err != nil {
 		return err
 	}

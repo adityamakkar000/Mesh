@@ -14,7 +14,7 @@ import (
 
 type SSHCommand func(ctx context.Context, cluster *parse.NodeConfig, mesh *parse.MeshConfig, host string, host_id int) error
 
-func ParseConfigs(clusterName string) (*parse.NodeConfig, *parse.MeshConfig, error) {
+func ParseConfigs(clusterName, meshYAMLDir string) (*parse.NodeConfig, *parse.MeshConfig, error) {
 	clusters, err := parse.Clusters()
 	if err != nil {
 		return nil, nil, ui.ErrorWrap(err, "failed to parse cluster.yaml")
@@ -25,7 +25,7 @@ func ParseConfigs(clusterName string) (*parse.NodeConfig, *parse.MeshConfig, err
 		return nil, nil, ui.ErrorWrap(fmt.Errorf("cluster not found"), "cluster '%s' not found in cluster.yaml", clusterName)
 	}
 
-	mesh, err := parse.Mesh()
+	mesh, err := parse.Mesh(meshYAMLDir)
 	if err != nil {
 		return nil, nil, ui.ErrorWrap(err, "failed to parse mesh.yaml")
 	}
