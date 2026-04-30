@@ -95,7 +95,7 @@ func runCleanupHost(ctx context.Context, cluster *parse.NodeConfig, mesh *parse.
 
 	// in theory this errors if the trainin job actually finished not sure why
 	// so just don't do error handling here
-	_ = client.Exec(ctx, fmt.Sprintf("pkill -9 python && rm -rf %s", remote_dir), io.Discard, io.Discard)
+	_ = client.Exec(ctx, fmt.Sprintf("rm -rf %s && pkill -9 python", remote_dir), io.Discard, io.Discard)
 	return nil
 }
 
