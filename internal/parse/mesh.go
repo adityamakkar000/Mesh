@@ -14,11 +14,13 @@ type MeshConfig struct {
 	Prerun   []string `yaml:"prerun"`
 }
 
-func Mesh() (*MeshConfig, error) {
-	filename, err := filepath.Abs("./mesh.yaml")
+// Mesh reads mesh.yaml from meshYAMLDir (absolute path after resolution).
+func Mesh(meshYAMLDir string) (*MeshConfig, error) {
+	root, err := filepath.Abs(meshYAMLDir)
 	if err != nil {
 		return nil, err
 	}
+	filename := filepath.Join(root, "mesh.yaml")
 
 	data, err := os.ReadFile(filename)
 	if err != nil {
