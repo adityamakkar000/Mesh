@@ -11,6 +11,7 @@ ignore:
   - ".env"
   - "mesh.yaml"
   - "*/prerun/*"
+  - ".venv/*"
 
 prerun:
   - uv venv --python 3.12 --clear
